@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+
+<style>
+
+	.node{
+		fill: #ccc;
+		stroke: #fff;
+		stroke-width: 2px;
+	}
+
+	.link{
+		stroke: #777;
+		stroke-width: 2px;
+	}
+	
+</style>
+
+<head>
+	<title>playground</title>
+	<script src="http://d3js.org/d3.v3.min.js"></script>
+</head>
+
+<body>
+
+<div id="option">
+    <input name="updateButton" 
+           type="button" 
+           value="Update" 
+           onclick="playAll()" />
+</div>
+
+<script>
+
+
+	// ---------------------------------------------------------------------------------------------------------
+	// ------------------------------------------- DATA --------------------------------------------------------
+	var data = {nodes: [{name: "C1", type: "contract", steps: [  {date: "2017-01-01", ead: 100, allocRec: 40}
+																, {date: "2017-02-01", ead: 75, allocRec: 23}
+																, {date: "2017-03-01", ead: 50, allocRec: 17}
+																, {date: "2017-04-01", ead: 25, allocRec: 5}
+																]
+						},
+						{name: "C2", type: "contract", steps: [	  {date: "2017-01-01", ead: 50, allocRec: 10}
+																, {date: "2017-02-01", ead: 50, allocRec: 17}
+																, {date: "2017-03-01", ead: 50, allocRec: 25}
+																, {date: "2017-04-01", ead: 50, allocRec: 20}
+																]
+						},
+						{name: "X", type: "collateral", steps: [  {date: "2017-01-01", rec: 50}
+																, {date: "2017-02-01", rec: 40}
+																, {date: "2017-02-01", rec: 10}
+																, {date: "2017-02-01", rec: 10}
+																]
+						}
+					],
+				links: [ {date: "2017-01-01", source : 0 , target: 2, dist: 100}
+						,{date: "2017-02-01", source : 0 , target: 2, dist: 50}
+						,{date: "2017-03-01", source : 0 , target: 2, dist: 50}
+						,{date: "2017-04-01", source : 0 , target: 2, dist: 50}
+						,{date: "2017-01-01", source : 1 , target: 2, dist: 20}
+						,{date: "2017-02-01", source : 1 , target: 2, dist: 20}
+						,{date: "2017-03-01", source : 1 , target: 2, dist: 20}
+						,{date: "2017-04-01", source : 1 , target: 2, dist: 20}
+				]};
+	
+	console.log(data);	
+	// ----------------------------------------------------------------------------------------------------------
+	
+	// SCALARS:
+	var globalContainer = {};
+	
+	var width = 1024;
+	var height = 768;
+	
+	var maxLtv = 5;
+	var minLtv = 1;
+	var maxEaD = 100; // findExtreme(data, "ead", "max");
+	var minEaD = 0; // findExtreme(data, "ead", "min");
+	var maxDist = 100;
+	var minDist = 20;
+	
+	// SVG:
+	var svg=d3.select('body').append('svg')
+		.attr('width', width)
+		.attr('height', height)
+		.append("g")
+		.attr("transform", "translate(0,50)");
+	
+	// define scales
+	nodeSizeScale = d3.scale.linear().domain([minEaD, maxEaD]).range([10,50]);					
+	nodeColorScale = d3.scale.linear().domain([minLtv, maxLtv]).range(["green","red"]);
+	nodeDistanceScale = d3.scale.linear().domain([minDist, maxDist]).range([50,800]);
+											 
+	// use the force
+	globalContainer.force = d3.layout.force() //build the layout
+					.size([width, height]) //specified earlier
+					.nodes(data.nodes) //add nodes
+					.links(data.links) //add links
+					.on("tick", tick) //what to do
+					.linkDistance(200)
+					.friction(0)
+					.gravity(.01)
+					.start();
+	
+	// add the links
+	globalContainer.link = svg.selectAll('.link')
+								  .data(data.links.slice(1,5))
+								  .enter().append('line')
+								  .attr('class', 'link'); 
+
+	// add the nodes	
+	globalContainer.node = svg.selectAll('.node')
+								.data(data.nodes) //add
+								.enter().append('circle')
+								.attr('class', 'node')
+								//radius of circle
+								.attr('r', function(x){
+														if(x.type == "contract"){
+															return nodeSizeScale(x.steps[0].ead)
+														} else{
+															return nodeSizeScale(x.steps[0].rec)
+														}								
+														}) 
+								.style("fill", function(x){	var color = "blue"
+															if(x.type == "contract"){
+																color = nodeColorScale( d3.min([d3.max([(x.steps[0].ead/x.steps[0].allocRec), minLtv]), maxLtv]) )
+																}
+															return color})
+								.style("stroke", "#FFF")
+								.style("stroke-width", 3);
+
+	function tick(e) {        
+		globalContainer.node.attr('cx', function(d) { return d.x; })
+							.attr('cy', function(d) { return d.y; })
+							.call(globalContainer.force.drag);
+			
+		globalContainer.link.attr('x1', function(d) { return d.source.x; })
+							.attr('y1', function(d) { return d.source.y; })
+							.attr('x2', function(d) { return d.target.x; })
+							.attr('y2', function(d) { return d.target.y; });
+	}								
+	
+	
+	// transition
+	function onchange() {
+		
+		var t = parseInt(d3.select('select').property('value'));
+		globalContainer.node.transition()
+								.duration(1500)
+								.delay(0)
+								.attr('r', function(x){
+														if(x.type == "contract"){
+															return nodeSizeScale(x.steps[t].ead)
+														} else{
+															return nodeSizeScale(x.steps[t].rec)
+														}								
+														})
+
+		};
+		
+	// play all
+	function playAll(){	
+		var delayTime = 0; 
+		for(i = 0; i < 3; i++){
+			globalContainer.node.transition()
+								.duration(1500)
+								.delay(delayTime)
+								.attr('r', function(x){
+														if(x.type == "contract"){
+															return nodeSizeScale(x.steps[i].ead)
+														} else{
+															return nodeSizeScale(x.steps[i].rec)
+														}								
+														})
+			delayTime += 2000;
+		}
+	}											
+												
+												
+	
+	// -------------------- HELPER FUNCTIONS -------------------------------
+	function findExtreme(data, type, what){
+	// TBD
+	
+	}
+
+	var opts = ["0", "1", "2", "3"];
+
+	var dropdown = d3.select('body')
+					  .append('select')
+					  .attr('class','select')
+					  .on('change',onchange);
+
+	var options = dropdown.selectAll('option')
+						  .data(opts).enter()
+						  .append('option')
+						  .text(function (d) { return d; });
+						  
+
+
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	/*
+	var opts = ["2017-01-01", "2017-02-01"];
+
+	var dropdown = d3.select('body')
+					  .append('select')
+					  .attr('class','select')
+					  .on('change',onchange);
+
+	var options = dropdown.selectAll('option')
+						  .data(opts).enter()
+						  .append('option')
+						  .text(function (d) { return d; });
+						  
+	var alreadyShown = false;
+
+	function onchange() {
+		selectedDate = d3.select('select').property('value')
+		if(!alreadyShown){	
+			showForThisDate(selectedDate);
+		} else{
+			updateForThisDate(selectedDate);
+		}
+		alreadyShown = true;
+	};
+	
+	
+		
+
+	
+	function showForThisDate(selectedDate){	
+		// select data snapshot based on date
+		var dataSnapshot = getFilteredData(data, selectedDate);
+
+		// use the force
+		globalContainer.force = d3.layout.force() //build the layout
+						.size([width, height]) //specified earlier
+						.nodes(dataSnapshot[0].nodes) //add nodes
+						.links(dataSnapshot[0].links) //add links
+						.on("tick", tick) //what to do
+						.linkDistance(function(link){return distanceScale(link.weight);})
+						.friction(0)
+						.gravity(.01)
+						.start();
+			
+		// add the links
+		globalContainer.link = svg.selectAll('.link')
+									  .data(dataSnapshot[0].links)
+									  .enter().append('line')
+									  .attr('class', 'link'); 
+
+		// add the nodes	
+		globalContainer.node = svg.selectAll('.node')
+									.data(dataSnapshot[0].nodes) //add
+								    .enter().append('circle')
+									.attr('class', 'node')
+									.attr('r', function(x){
+															if(x.type == "contract"){
+																return circleSizeScale(x.ead)
+															} else{
+																return circleSizeScale(x.rec)
+															}								
+															}) //radius of circle
+									.style("fill", function(x){	var color = "blue"
+																if(x.type == "contract"){
+																	color = collateralizationScale( d3.min([d3.max([(x.ead/x.allocRec), minLtv]), maxLtv]) )
+																	}
+																return color})
+									.style("stroke", "#FFF")
+									.style("stroke-width", 3)
+									.on("mouseover",function()
+									{
+										tooltip.style("display",null);
+									})
+									.on("mouseout", function()
+									{
+										tooltip.style("display","none");
+									})
+									.on("mousemove", function(d)
+									{
+										var xPos = d3.mouse(this)[0] - 15;
+										var yPos = d3.mouse(this)[1] - 55;
+										tooltip.attr("transform", "translate(" + xPos + "," + yPos + ")");
+										tooltip.select("text").text("ID : " + d.name + " | type: " + d.type)
+									});	
+	} // end of showForThisDate
+	
+	function getFilteredData(data, dateAsString) {
+
+			return data.filter(function(row) { return row.date === dateAsString; });
+	}
+	
+	function tick(e) {        
+		globalContainer.node.attr('cx', function(d) { return d.x; })
+							.attr('cy', function(d) { return d.y; })
+							.call(globalContainer.force.drag);
+			
+		globalContainer.link.attr('x1', function(d) { return d.source.x; })
+							.attr('y1', function(d) { return d.source.y; })
+							.attr('x2', function(d) { return d.target.x; })
+							.attr('y2', function(d) { return d.target.y; });
+	}
+
+	var tooltip = svg.append("g")
+					 .attr("class", tooltip)
+					 .style("display", "none");
+					 
+		tooltip.append("text")
+			   .attr("x", 15)
+			   .attr("dy", "1.2em")
+			   .style("font-size", "1em")
+			   .attr("font-weight", "bold");	
+	
+	function updateForThisDate(selectedDate){	
+		// select data snapshot based on date
+		var dataSnapshot = getFilteredData(data, selectedDate);
+		var timeToChange = 1500;
+		
+		globalContainer.node.transition()
+							.attr('r', function(x){
+													if(x.type == "contract"){
+														return circleSizeScale(x.ead)
+													} else{
+														return circleSizeScale(x.rec)
+													}								
+													})
+							.duration(timeToChange);
+			
+		
+	
+	}
+	
+*/
+			   
+			   
+
+</script>
+
+
+</body>
+</html>

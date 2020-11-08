@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+
+<style>
+
+	.node{
+		fill: #ccc;
+		stroke: #fff;
+		stroke-width: 2px;
+	}
+
+	.link{
+		stroke: #777;
+		stroke-width: 2px;
+	}
+	
+</style>
+
+<head>
+	<title>playground</title>
+	<script src="http://d3js.org/d3.v3.min.js"></script>
+</head>
+
+<body>
+<script>
+
+
+	// ---------------------------------------------------------------------------------------------------------
+	// ------------------------------------------- DATA --------------------------------------------------------
+	var data = [{date:"2017-01-01", nodes:[
+											{name: "C1", type: "contract", ead: 100, allocRec: 30}
+										  , {name: "C2", type: "contract", ead: 20, allocRec: 50}
+										  , {name : "X", type: "collateral", rec: 70}			
+										  ]
+								  , links:[
+											{source : 0 , target: 2, weight: 100}
+										  , {source : 1 , target: 2, weight: 20}
+										  ]
+				}
+			   ]
+	console.log(data)	
+	// ----------------------------------------------------------------------------------------------------------
+	
+	// create empty nodes array
+	var selectedDate = "2017-01-01"
+    var nodes = {};
+	var width = 1024;
+	var height = 768;
+	var maxLtv = 5;
+	var minLtv = 1;
+   
+	// add a SVG to the body for our viz
+    var svg=d3.select('body').append('svg')
+        .attr('width', width)
+        .attr('height', height);
+		
+	// select data snapshot based on date
+	function getFilteredData(data, dateAsString) {
+		return data.filter(function(row) { return row.date === dateAsString; });
+	}
+	
+	var dataSnapshot = getFilteredData(data, selectedDate);
+	
+	// define scales
+	var circleSizeScale = d3.scale.linear()
+							.domain([0, d3.max(dataSnapshot[0].nodes, function(d) { return +d.ead;} )])
+							.range([0,30]);
+							
+	var collateralizationScale = d3.scale.linear()
+									     .domain([minLtv, maxLtv])
+							             .range(["green","red"]);
+										 
+	var distanceScale = d3.scale.linear()
+									     .domain([0, d3.max(dataSnapshot[0].links, function(d) { return +d.weight;} )])
+							             .range([10,400]);
+	
+	// use the force
+    var force = d3.layout.force() //build the layout
+        .size([width, height]) //specified earlier
+        .nodes(dataSnapshot[0].nodes) //add nodes
+        .links(dataSnapshot[0].links) //add links
+        .on("tick", tick) //what to do
+        .linkDistance(function(x){return x.weight * 2})
+		.friction(0)
+		.gravity(.01)
+		.start();
+		
+	// add the links
+    var link = svg.selectAll('.link')
+        .data(dataSnapshot[0].links)
+        .enter().append('line')
+        .attr('class', 'link'); 
+
+    // add the nodes	
+    var node = svg.selectAll('.node')
+        .data(dataSnapshot[0].nodes) //add
+        .enter().append('circle')
+        .attr('class', 'node')
+        .attr('r', function(x){
+								if(x.type == "contract"){
+									return circleSizeScale(x.ead)
+								} else{
+									return circleSizeScale(x.rec)
+								}								
+								}) //radius of circle
+		.style("fill", function(x){	var color = "blue"
+									if(x.type == "contract"){
+										color = collateralizationScale( d3.min([d3.max([(x.ead/x.allocRec), minLtv]), maxLtv]) )
+										}
+									return color})
+		.style("stroke", "#FFF")
+		.style("stroke-width", 3)
+		.on("mouseover",function()
+		{
+			tooltip.style("display",null);
+		})
+		.on("mouseout", function()
+		{
+			tooltip.style("display","none");
+		})
+		.on("mousemove", function(d)
+		{
+			var xPos = d3.mouse(this)[0] - 15;
+			var yPos = d3.mouse(this)[1] - 55;
+			tooltip.attr("transform", "translate(" + xPos + "," + yPos + ")");
+			tooltip.select("text").text("ID : " + d.name + " | type: " + d.type)
+		});
+		
+    function tick(e) {        
+        node.attr('cx', function(d) { return d.x; })
+            .attr('cy', function(d) { return d.y; })
+            .call(force.drag);
+            
+        link.attr('x1', function(d) { return d.source.x; })
+            .attr('y1', function(d) { return d.source.y; })
+            .attr('x2', function(d) { return d.target.x; })
+            .attr('y2', function(d) { return d.target.y; });
+    }
+	
+	var tooltip = svg.append("g")
+					 .attr("class", tooltip)
+					 .style("display", "none");
+					 
+		tooltip.append("text")
+			   .attr("x", 15)
+			   .attr("dy", "1.2em")
+			   .style("font-size", "1em")
+			   .attr("font-weight", "bold");
+			   
+			   
+
+</script>
+
+
+</body>
+</html>

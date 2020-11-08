@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+
+<style>
+
+	body {
+		background-color: #a9aeb2;
+	}
+	
+	.node{
+		fill: #ccc;
+		stroke: #fff;
+		stroke-width: 2px;
+	}
+
+	.link{
+		stroke: #777;
+		stroke-width: 2px;
+	}
+	
+	div.plotArea {
+		position: absolute;
+		top: 50px;
+		left: 5px;
+		width: 730px;
+		height: 700px;
+		border: 3px solid #f2d42b;
+		background-color: #ffffff;
+	}
+	
+	div.dropdownButton {
+		position: absolute;
+		top: 10px;
+		left: 100px;
+	}
+	
+	div.simulationButton {
+		position: absolute;
+		top: 10px;
+		left: 250px;
+	}
+	
+	div.legend {
+		position: absolute;
+		top: 50px;
+		left: 750px;
+		width: 250px;
+		height: 700px;
+		background-color: #ffffff;
+	}
+	
+	div.controller {
+		position: absolute;
+		top: 5px;
+		left: 5px;
+		width: 730px;
+		height: 35px;
+		background-color: #f2d42b;
+	}
+	
+	div.stepCounter {
+		position: absolute;
+		top: 15px;
+		left: 500px;
+		width: 200px;
+		height: 20px;
+		background-color: #f2d42b;
+	}
+	
+</style>
+
+<head>
+	<title>playground</title>
+	<script src="http://d3js.org/d3.v3.min.js"></script>
+</head>
+
+<body>
+	<div id="legend" class="legend">
+		<canvas id="myCanvas" width="250px" height="700px" style="border:2px solid #329efc;"></canvas>
+	</div>
+	<div id="controller" class="controller" width="734px" height="35px" style="border:2px solid #f2d42b;">
+		<canvas id="controllerCanvas"></canvas>
+	</div>
+	<div id="stepCounter" class="stepCounter" width="200px" height="20px" style="border:0px solid #f2d42b;">
+		<canvas id="stepCounterCanvas"></canvas>
+	</div>		
+	<div id="plotArea" class="plotArea"></div>
+	<div id="dropdownButton" class="dropdownButton"></div>
+	<div id="simulationButton", class="simulationButton">
+		<input name="updateButton" 
+			   type="button" 
+			   value="Play the entire evolution!" 
+			   onclick="playAll()" />
+	</div>
+
+<script>
+	var opts = ["0", "1", "2", "3"];
+	
+	var dropdown = d3.select('#dropdownButton')
+					  .append('select')
+					  .attr('class','select')
+					  .on('change',onchange);
+
+	var options = dropdown.selectAll('option')
+						  .data(opts).enter()
+						  .append('option')
+						  .text(function (d) { return d; });
+	
+	// ------------------------------------------- DATA --------------------------------------------------------
+	var data = {nodes: [{name: "Contract_1", type: "contract", steps: [  {date: "2017-01-01", ead: 100, allocRec: 40}
+																, {date: "2017-02-01", ead: 75, allocRec: 23}
+																, {date: "2017-03-01", ead: 50, allocRec: 17}
+																, {date: "2017-04-01", ead: 25, allocRec: 5}
+																]
+						},
+						{name: "Contract_2", type: "contract", steps: [	  {date: "2017-01-01", ead: 50, allocRec: 10}
+																, {date: "2017-02-01", ead: 50, allocRec: 17}
+																, {date: "2017-03-01", ead: 50, allocRec: 25}
+																, {date: "2017-04-01", ead: 50, allocRec: 20}
+																]
+						},
+						{name: "Collateral_X", type: "collateral_funded", steps: [ {date: "2017-01-01", rec: 50}
+																, {date: "2017-02-01", rec: 40}
+																, {date: "2017-02-01", rec: 10}
+																, {date: "2017-02-01", rec: 10}
+																]
+						},
+						{name: "Collateral_Y", type: "collateral_unfunded", steps: [ {date: "2017-01-01", rec: 50}
+																, {date: "2017-02-01", rec: 40}
+																, {date: "2017-02-01", rec: 10}
+																, {date: "2017-02-01", rec: 10}
+																]
+						},
+						{name: "Collateral_Z", type: "collateral_funded", steps: [ {date: "2017-01-01", rec: 50}
+																, {date: "2017-02-01", rec: 40}
+																, {date: "2017-02-01", rec: 10}
+																, {date: "2017-02-01", rec: 10}
+																]
+						},
+						{name: "Underlying_1", type: "underlying", steps: [ {date: "2017-01-01", rec: 50}
+																, {date: "2017-02-01", rec: 40}
+																, {date: "2017-02-01", rec: 10}
+																, {date: "2017-02-01", rec: 10}
+																]
+						},
+						{name: "Underlying_2", type: "underlying", steps: [ {date: "2017-01-01", rec: 50}
+																, {date: "2017-02-01", rec: 40}
+																, {date: "2017-02-01", rec: 10}
+																, {date: "2017-02-01", rec: 10}
+																]
+						}
+						,
+						{name: "Underlying_3", type: "underlying", steps: [ {date: "2017-01-01", rec: 50}
+																, {date: "2017-02-01", rec: 40}
+																, {date: "2017-02-01", rec: 10}
+																, {date: "2017-02-01", rec: 10}
+																]
+						}
+					],
+				links: [{source : 1, target : 3, steps: [ {date: "2017-01-01", weight : 50}
+														, {date: "2017-02-01", weight : 10}
+														, {date: "2017-03-01", weight : 20}
+														, {date: "2017-04-01", weight : 30}
+														]
+						},
+						{source : 1, target : 2, steps: [ {date: "2017-01-01", weight : 20}
+														, {date: "2017-02-01", weight : 25}
+														, {date: "2017-03-01", weight : 28}
+														, {date: "2017-04-01", weight : 21}
+														]
+						},
+						{source : 0, target : 4, steps: [ {date: "2017-01-01", weight : 20}
+														, {date: "2017-02-01", weight : 25}
+														, {date: "2017-03-01", weight : 28}
+														, {date: "2017-04-01", weight : 21}
+														]
+						},
+						{source : 2, target : 6, steps: [ {date: "2017-01-01", weight : 20}
+														, {date: "2017-02-01", weight : 25}
+														, {date: "2017-03-01", weight : 28}
+														, {date: "2017-04-01", weight : 21}
+														]
+						},
+						{source : 2, target : 5, steps: [ {date: "2017-01-01", weight : 20}
+														, {date: "2017-02-01", weight : 25}
+														, {date: "2017-03-01", weight : 28}
+														, {date: "2017-04-01", weight : 21}
+														]
+						},
+						{source : 4, target : 7, steps: [ {date: "2017-01-01", weight : 20}
+														, {date: "2017-02-01", weight : 25}
+														, {date: "2017-03-01", weight : 28}
+														, {date: "2017-04-01", weight : 21}
+														]
+						},
+						{source : 0, target : 2, steps: [ {date: "2017-01-01", weight : 20}
+														, {date: "2017-02-01", weight : 25}
+														, {date: "2017-03-01", weight : 28}
+														, {date: "2017-04-01", weight : 21}
+														]
+						}
+				]};
+	
+	//console.log(data);	
+	// ----------------------------------------------------------------------------------------------------------
+	
+	// SCALARS:
+	var globalContainer = {};
+	
+	var width = 730;
+	var height = 700;
+	
+	var ltvLimits = [1,5];
+	var valueLimits = [0, 100]; // use findExtreme(data, "ead", "max");
+	var weightLimits = [10,50];
+	
+	var strokeThicknessLimits = [25,100];
+	var nodeSizeLimits = [10,50];
+		
+	// COLORS:
+	// #ff2419 - red
+	// #18ff4a - green
+	// #ffffff - white
+	// #000000 - black
+	
+	var cotractLtv = ['#18ff4a', '#ff2419']; // Low: Green, High: Red
+	var collateralContribution = ['#ffffff', '#18ff4a']; // Green stroke, Unfunded: White, Funded: Green 
+	var underlyingContribution = ['#ffffff'];  // 
+	
+	// SVG:
+	var svg=d3.select('#plotArea').append('svg')
+		.attr('width', width)
+		.attr('height', height)
+		.append("g")
+		.attr("border",1);
+		
+		
+	var borderPath = svg.append("rect")
+		.attr("x", 0)
+		.attr("y", 0)
+		.attr("height", height)
+		.attr("width", width)
+		//.style("stroke", 'black')
+		.style("fill", "none");	
+	
+	// LEGEND:
+	var canvas = document.getElementById("myCanvas");	
+	var ctx = canvas.getContext("2d");	
+	ctx.font = "20px Arial";
+	ctx.fillStyle = '#f2d42b';
+	ctx.fillText("LEGEND",5,30);
+	
+	ctx.beginPath();
+	ctx.lineWidth = 5;
+	ctx.arc(80,120,nodeSizeLimits[1],0,2*Math.PI);
+	ctx.stroke();
+	ctx.strokeStyle = '#000000';
+	ctx.fillStyle = '#ffffff';
+	ctx.fill();	
+	ctx.font = "12px Arial";
+	ctx.fillStyle = '#f2d42b';
+	ctx.fillText("Large Exposure",35,210);
+	
+	ctx.beginPath();
+	ctx.arc(180,120,nodeSizeLimits[0],0,2*Math.PI);
+	ctx.stroke();
+	ctx.fillStyle = '#ffffff';
+	ctx.fill();	
+	ctx.font = "12px Arial";
+	ctx.fillStyle = '#f2d42b';
+	ctx.fillText("Small Exposure",135,210);
+	
+	ctx.beginPath();
+	ctx.arc(80,280,(nodeSizeLimits[0]+nodeSizeLimits[1])/2,0,2*Math.PI);
+	ctx.stroke();
+	ctx.fillStyle = cotractLtv[0];
+	ctx.fill();	
+	ctx.font = "12px Arial";
+	ctx.fillStyle = '#f2d42b';
+	ctx.fillText("LTV < 1",55,340);
+	
+	ctx.beginPath();
+	ctx.arc(180,280,(nodeSizeLimits[0]+nodeSizeLimits[1])/2,0,2*Math.PI);
+	ctx.stroke();
+	ctx.fillStyle = cotractLtv[1];
+	ctx.fill();	
+	ctx.font = "12px Arial";
+	ctx.fillStyle = '#f2d42b';
+	ctx.fillText("LTV > 5",160,340);
+	
+	ctx.beginPath();
+	ctx.arc(80,430,(nodeSizeLimits[0]+nodeSizeLimits[1])/2,0,2*Math.PI);
+	ctx.strokeStyle = cotractLtv[0];
+	ctx.stroke();	
+	ctx.fillStyle = collateralContribution[0];
+	ctx.fill();	
+	ctx.font = "12px Arial";
+	ctx.fillStyle = '#f2d42b';
+	ctx.fillText("Unfunded collateral",20,500);
+	
+	ctx.beginPath();
+	ctx.arc(180,430,(nodeSizeLimits[0]+nodeSizeLimits[1])/2,0,2*Math.PI);
+	ctx.stroke();
+	ctx.fillStyle = collateralContribution[1];
+	ctx.fill();	
+	ctx.font = "12px Arial";
+	ctx.fillStyle = '#f2d42b';
+	ctx.fillText("Funded collateral",140,500);
+	
+	ctx.beginPath();
+	ctx.arc(80,580,(nodeSizeLimits[0]+nodeSizeLimits[1])/2,0,2*Math.PI);
+	ctx.strokeStyle = '#a9aeb2';
+	ctx.stroke();
+	ctx.fillStyle = collateralContribution[1];
+	ctx.fill();	
+	ctx.font = "12px Arial";
+	ctx.fillStyle = '#f2d42b';
+	ctx.fillText("Underlying asset",50,650);
+	
+	// CONTROLLER CANVAS:
+	controllerCanvas = document.getElementById("controllerCanvas");	
+	var ctx = controllerCanvas.getContext("2d");
+	ctx.font = "15px Arial";
+	ctx.fillStyle = "#329efc";
+	ctx.fillText("Set date: ", 10, 20)
+	
+	// STEP COUNTER
+	stepCounterCanvas = document.getElementById("stepCounterCanvas");	
+	var ctx1 = stepCounterCanvas.getContext("2d");
+	ctx1.clearRect(0, 0, stepCounterCanvas.width, stepCounterCanvas.height);	
+	ctx1.font = "20px Arial";
+	ctx1.fillStyle = "#329efc";
+	ctx1.fillText("Date: 0",50,15);	
+
+	// define scales
+	nodeSizeScale = d3.scale.linear().domain(valueLimits).range(nodeSizeLimits);
+	
+	nodeColorScaleContract = d3.scale.linear().domain(ltvLimits).range(cotractLtv);
+	nodeColorScaleCollateral = d3.scale.linear().domain(valueLimits).range(collateralContribution);
+	
+	linkSizeScale = d3.scale.linear().domain(weightLimits).range([3,15]);
+	linkColorScale = d3.scale.linear().domain(weightLimits).range(collateralContribution);
+	
+	
+	// use the force
+	globalContainer.force = d3.layout.force() //build the layout
+					.size([width, height]) //specified earlier
+					.nodes(data.nodes) //add nodes
+					.links(data.links) //add links
+					.on("tick", tick) //what to do
+					.linkDistance(200)
+					.friction(0.6)
+					.gravity(.05)
+					.charge(-1500)
+					.start();
+	
+	// add the links
+	globalContainer.link = svg.selectAll('.link')
+								  .data(data.links)
+								  .enter().append('line')
+								  .attr('class', 'link')
+								  .style('stroke-width', function(link){return linkSizeScale(link.steps[0].weight)})
+								  .style('stroke', function(link){return linkColorScale(link.steps[0].weight)});
+
+	// add the nodes	
+	globalContainer.node = svg.selectAll('.node')
+								.data(data.nodes) //add
+								.enter().append('circle')
+								.attr('class', 'node')
+								//append contracts as circles
+								.attr('r', function(x){
+														if(x.type === "contract"){
+															return nodeSizeScale(x.steps[0].ead);
+														} else if(x.type === "collateral_funded"){
+															return nodeSizeScale(x.steps[0].rec);
+														} else if(x.type === "collateral_unfunded"){
+															return nodeSizeScale(x.steps[0].rec);
+														} else{
+															return 
+														}								
+														}) 
+								.style("fill", function(x){if(x.type == "contract"){
+																return nodeColorScaleContract( d3.min([d3.max([(x.steps[0].ead/x.steps[0].allocRec), ltvLimits[0]]), ltvLimits[1]]) )
+															} else{
+																return nodeColorScaleCollateral(x.steps[0].rec)
+															}
+															})
+								.style("stroke",function(x){
+															if(x.type == "contract"){
+																return '#000000';
+															} else if (x.type === "collateral"){
+																return collateralContribution[1];
+															} else{
+																return '#ffffff';
+															}								
+														} 
+								)
+								.style("stroke-width", 3);
+
+	function tick(e) {        
+		globalContainer.node.attr('cx', function(d) { return d.x; })
+							.attr('cy', function(d) { return d.y; })
+							.call(globalContainer.force.drag);
+			
+		globalContainer.link.attr('x1', function(d) { return d.source.x; })
+							.attr('y1', function(d) { return d.source.y; })
+							.attr('x2', function(d) { return d.target.x; })
+							.attr('y2', function(d) { return d.target.y; });
+	}								
+		
+	// do transitions
+	function onchange() {
+		var step = parseInt(d3.select('select').property('value'));
+		doNodeTransition(globalContainer.node, step, 1500, 0);
+		doLinkTransition(globalContainer.link, step, 1500, 0);
+				
+		var stepCounterCanvas = document.getElementById("stepCounterCanvas");
+		var ctx1 = stepCounterCanvas.getContext("2d");
+		ctx1.fillStyle = "#f2d42b";
+		ctx1.canvas.width = ctx1.canvas.width;
+		ctx1.fillStyle = "#329efc";
+		ctx1.font = "20px Arial"
+		ctx1.fillText("Date: " + step, 50, 15);
+		ctx1.fill();		
+	};
+		
+	// play all
+	function playAll(){	
+		var delayTime = 2000; 
+		for(i = 0; i < 3; i++){			
+			doNodeTransition(globalContainer.node, i, 1500, delayTime)
+			doLinkTransition(globalContainer.link, i, 1500, delayTime);
+			delayTime += 2000;
+			
+			updateStepText(i, delayTime);
+		}
+	}											
+																					
+	
+	// -------------------- HELPER FUNCTIONS -------------------------------
+	function findExtreme(data, type, what){
+	// TBD
+	
+	}
+	
+	function doNodeTransition(nodes, step, duration, delay){	
+		nodes.transition()
+			.duration(duration)
+			.delay(delay)
+			.attr('r', function(x){
+									if(x.type == "contract"){
+										return nodeSizeScaleContract(x.steps[step].ead)
+									} else{
+										return nodeSizeScaleCollateral(x.steps[step].rec)
+									}								
+									}) 
+			.style("fill", function(x){if(x.type == "contract"){
+											return nodeColorScaleContract( d3.min([d3.max([(x.steps[step].ead/x.steps[step].allocRec), ltvLimits[0]]), ltvLimits[1]]) )
+										} else{
+											return nodeColorScaleCollateral(x.steps[step].rec)
+										}
+										})
+	}
+	
+	function doLinkTransition(links, step, duration, delay){	
+		links.transition()
+			.duration(duration)
+			.delay(delay)
+		    .style('stroke-width', function(link){return linkSizeScale(link.steps[step].weight)})
+		    .style('stroke', function(link){return linkColorScale(link.steps[step].weight)});
+	}
+	
+	function updateStepText(step, delayTime){
+			setTimeout(function(){
+				var j = step+1;
+				var stepCounterCanvas = document.getElementById("stepCounterCanvas");
+				var ctx1 = stepCounterCanvas.getContext("2d");
+				ctx1.fillStyle = "#e8edf2";
+				ctx1.canvas.width = ctx1.canvas.width;
+				ctx1.fillStyle = "#329efc";
+				ctx1.font = "20px Arial";
+				ctx1.fillText("Date: " + j, 50, 15);
+				ctx1.fill();
+			},delayTime)	
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	/*
+	var opts = ["2017-01-01", "2017-02-01"];
+
+	var dropdown = d3.select('body')
+					  .append('select')
+					  .attr('class','select')
+					  .on('change',onchange);
+
+	var options = dropdown.selectAll('option')
+						  .data(opts).enter()
+						  .append('option')
+						  .text(function (d) { return d; });
+						  
+	var alreadyShown = false;
+
+	function onchange() {
+		selectedDate = d3.select('select').property('value')
+		if(!alreadyShown){	
+			showForThisDate(selectedDate);
+		} else{
+			updateForThisDate(selectedDate);
+		}
+		alreadyShown = true;
+	};
+	
+	
+		
+
+	
+	function showForThisDate(selectedDate){	
+		// select data snapshot based on date
+		var dataSnapshot = getFilteredData(data, selectedDate);
+
+		// use the force
+		globalContainer.force = d3.layout.force() //build the layout
+						.size([width, height]) //specified earlier
+						.nodes(dataSnapshot[0].nodes) //add nodes
+						.links(dataSnapshot[0].links) //add links
+						.on("tick", tick) //what to do
+						.linkDistance(function(link){return distanceScale(link.weight);})
+						.friction(0)
+						.gravity(.01)
+						.start();
+			
+		// add the links
+		globalContainer.link = svg.selectAll('.link')
+									  .data(dataSnapshot[0].links)
+									  .enter().append('line')
+									  .attr('class', 'link'); 
+
+		// add the nodes	
+		globalContainer.node = svg.selectAll('.node')
+									.data(dataSnapshot[0].nodes) //add
+								    .enter().append('circle')
+									.attr('class', 'node')
+									.attr('r', function(x){
+															if(x.type == "contract"){
+																return circleSizeScale(x.ead)
+															} else{
+																return circleSizeScale(x.rec)
+															}								
+															}) //radius of circle
+									.style("fill", function(x){	var color = "blue"
+																if(x.type == "contract"){
+																	color = collateralizationScale( d3.min([d3.max([(x.ead/x.allocRec), minLtv]), maxLtv]) )
+																	}
+																return color})
+									.style("stroke", "#FFF")
+									.style("stroke-width", 3)
+									.on("mouseover",function()
+									{
+										tooltip.style("display",null);
+									})
+									.on("mouseout", function()
+									{
+										tooltip.style("display","none");
+									})
+									.on("mousemove", function(d)
+									{
+										var xPos = d3.mouse(this)[0] - 15;
+										var yPos = d3.mouse(this)[1] - 55;
+										tooltip.attr("transform", "translate(" + xPos + "," + yPos + ")");
+										tooltip.select("text").text("ID : " + d.name + " | type: " + d.type)
+									});	
+	} // end of showForThisDate
+	
+	function getFilteredData(data, dateAsString) {
+
+			return data.filter(function(row) { return row.date === dateAsString; });
+	}
+	
+	function tick(e) {        
+		globalContainer.node.attr('cx', function(d) { return d.x; })
+							.attr('cy', function(d) { return d.y; })
+							.call(globalContainer.force.drag);
+			
+		globalContainer.link.attr('x1', function(d) { return d.source.x; })
+							.attr('y1', function(d) { return d.source.y; })
+							.attr('x2', function(d) { return d.target.x; })
+							.attr('y2', function(d) { return d.target.y; });
+	}
+
+	var tooltip = svg.append("g")
+					 .attr("class", tooltip)
+					 .style("display", "none");
+					 
+		tooltip.append("text")
+			   .attr("x", 15)
+			   .attr("dy", "1.2em")
+			   .style("font-size", "1em")
+			   .attr("font-weight", "bold");	
+	
+	function updateForThisDate(selectedDate){	
+		// select data snapshot based on date
+		var dataSnapshot = getFilteredData(data, selectedDate);
+		var timeToChange = 1500;
+		
+		globalContainer.node.transition()
+							.attr('r', function(x){
+													if(x.type == "contract"){
+														return circleSizeScale(x.ead)
+													} else{
+														return circleSizeScale(x.rec)
+													}								
+													})
+							.duration(timeToChange);
+			
+		
+	
+	}
+	
+*/
+			   
+			   
+
+</script>
+
+
+</body>
+</html>

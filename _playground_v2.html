@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+
+<style>
+
+	.node{
+		fill: #ccc;
+		stroke: #fff;
+		stroke-width: 2px;
+	}
+
+	.link{
+		stroke: #777;
+		stroke-width: 2px;
+	}
+	
+</style>
+
+<head>
+	<title>playground</title>
+	<script src="http://d3js.org/d3.v3.min.js"></script>
+</head>
+
+<body>
+<script>
+
+
+	// ---------------------------------------------------------------------------------------------------------
+	// ------------------------------------------- DATA --------------------------------------------------------
+	var data = [{date:"2017-01-01", nodes:[
+											{name: "C1", type: "contract", ead: 100, allocRec: 40}
+										  , {name: "C2", type: "contract", ead: 50, allocRec: 10}
+										  , {name : "X", type: "collateral", rec: 50}			
+										  ]
+								  , links:[
+											{source : 0 , target: 2, weight: 100}
+										  , {source : 1 , target: 2, weight: 20}
+										  ]
+				}
+				,
+				{date:"2017-02-01", nodes:[
+											{name: "C1", type: "contract", ead: 75, allocRec: 23}
+										  , {name: "C2", type: "contract", ead: 50, allocRec: 17}
+										  , {name : "X", type: "collateral", rec: 40}			
+										  ]
+								  , links:[
+											{source : 0 , target: 2, weight: 50}
+										  , {source : 1 , target: 2, weight: 20}
+										  ]
+				}
+				,
+				{date:"2017-03-01", nodes:[
+											{name: "C1", type: "contract", ead: 50, allocRec: 15}
+										  , {name: "C2", type: "contract", ead: 50, allocRec: 15}
+										  , {name : "X", type: "collateral", rec: 30}			
+										  ]
+								  , links:[
+											{source : 0 , target: 2, weight: 50}
+										  , {source : 1 , target: 2, weight: 20}
+										  ]
+				}
+				,
+				{date:"2017-04-01", nodes:[
+											{name: "C1", type: "contract", ead: 25, allocRec: 5}
+										  , {name: "C2", type: "contract", ead: 50, allocRec: 15}
+										  , {name : "X", type: "collateral", rec: 20}			
+										  ]
+								  , links:[
+											{source : 0 , target: 2, weight: 50}
+										  , {source : 1 , target: 2, weight: 20}
+										  ]
+				}
+			   ]
+	//console.log(data)	
+	// ----------------------------------------------------------------------------------------------------------
+	
+	var opts = ["2017-01-01", "2017-02-01", "2017-03-01","2017-04-01"];
+
+	var dropdown = d3.select('body')
+					  .append('select')
+					  .attr('class','select')
+					  .on('change',onchange);
+
+	var options = dropdown.selectAll('option')
+						  .data(opts).enter()
+						  .append('option')
+						  .text(function (d) { return d; });
+						  
+	var alreadyShown = false;
+
+	function onchange() {
+		selectedDate = d3.select('select').property('value')
+		if(!alreadyShown){	
+			showForThisDate(selectedDate);
+		} else{
+			updateForThisDate(selectedDate);
+		}
+		alreadyShown = true;
+	};
+	
+	// create empty nodes array
+	var nodes = {};
+	var width = 1024;
+	var height = 768;
+	var maxLtv = 5;
+	var minLtv = 1;
+	var globalContainer = {};
+	
+	// add a SVG to the body for our viz
+	var svg=d3.select('body').append('svg')
+		.attr('width', width)
+		.attr('height', height)
+		.append("g")
+		.attr("transform", "translate(0,50)");
+		
+	// define scales
+	var eads = [];
+	for(i = 0; i < data.length; i++){
+		for(j = 0; j < data[i].nodes.length; j++){
+			eads.push(data[i].nodes[j].ead);
+		}
+	}
+	
+	var weights = [];
+	for(i = 0; i < data.length; i++){
+		for(j = 0; j < data[i].links.length; j++){
+			weights.push(data[i].links[j].weight);
+		}
+	}
+	
+	circleSizeScale = d3.scale.linear()
+							  .domain([0, d3.max(eads)])
+							  .range([0,30]);
+								
+	collateralizationScale = d3.scale.linear()
+									 .domain([minLtv, maxLtv])
+									 .range(["green","red"]);
+											 
+	distanceScale = d3.scale.linear()
+							.domain([0, d3.max(weights)])
+							.range([50,800]);
+	
+	function showForThisDate(selectedDate){	
+		// select data snapshot based on date
+		var dataSnapshot = getFilteredData(data, selectedDate);
+
+		// use the force
+		globalContainer.force = d3.layout.force() //build the layout
+						.size([width, height]) //specified earlier
+						.nodes(dataSnapshot[0].nodes) //add nodes
+						.links(dataSnapshot[0].links) //add links
+						.on("tick", tick) //what to do
+						.linkDistance(function(link){return distanceScale(link.weight);})
+						.friction(0)
+						.gravity(.01)
+						.start();
+			
+		// add the links
+		globalContainer.link = svg.selectAll('.link')
+									  .data(dataSnapshot[0].links)
+									  .enter().append('line')
+									  .attr('class', 'link'); 
+
+		// add the nodes	
+		globalContainer.node = svg.selectAll('.node')
+									.data(dataSnapshot[0].nodes) //add
+								    .enter().append('circle')
+									.attr('class', 'node')
+									.attr('r', function(x){
+															if(x.type == "contract"){
+																return circleSizeScale(x.ead)
+															} else{
+																return circleSizeScale(x.rec)
+															}								
+															}) //radius of circle
+									.style("fill", function(x){	var color = "blue"
+																if(x.type == "contract"){
+																	color = collateralizationScale( d3.min([d3.max([(x.ead/x.allocRec), minLtv]), maxLtv]) )
+																	}
+																return color})
+									.style("stroke", "#FFF")
+									.style("stroke-width", 3)
+									.on("mouseover",function()
+									{
+										tooltip.style("display",null);
+									})
+									.on("mouseout", function()
+									{
+										tooltip.style("display","none");
+									})
+									.on("mousemove", function(d)
+									{
+										var xPos = d3.mouse(this)[0] - 15;
+										var yPos = d3.mouse(this)[1] - 55;
+										tooltip.attr("transform", "translate(" + xPos + "," + yPos + ")");
+										tooltip.select("text").text("ID : " + d.name + " | type: " + d.type)
+									});	
+	} // end of showForThisDate
+	
+	function getFilteredData(data, dateAsString) {
+			return data.filter(function(row) { return row.date === dateAsString; });
+	}
+	
+	function tick(e) {        
+		globalContainer.node.attr('cx', function(d) { return d.x; })
+							.attr('cy', function(d) { return d.y; })
+							.call(globalContainer.force.drag);
+			
+		globalContainer.link.attr('x1', function(d) { return d.source.x; })
+							.attr('y1', function(d) { return d.source.y; })
+							.attr('x2', function(d) { return d.target.x; })
+							.attr('y2', function(d) { return d.target.y; });
+	}
+
+	var tooltip = svg.append("g")
+					 .attr("class", tooltip)
+					 .style("display", "none");
+					 
+		tooltip.append("text")
+			   .attr("x", 15)
+			   .attr("dy", "1.2em")
+			   .style("font-size", "1em")
+			   .attr("font-weight", "bold");	
+	
+	function updateForThisDate(selectedDate){	
+		// select data snapshot based on date
+		var dataSnapshot = getFilteredData(data, selectedDate);
+		var timeToChange = 1500;
+		
+		globalContainer.node.
+		
+		globalContainer.node.transition()
+							.attr('r', function(x){
+													if(x.type == "contract"){
+														return circleSizeScale(x.ead)
+													} else{
+														return circleSizeScale(x.rec)
+													}								
+													})
+							.duration(timeToChange);
+			
+		
+	
+	}
+	
+
+			   
+			   
+
+</script>
+
+
+</body>
+</html>

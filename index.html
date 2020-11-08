@@ -1,0 +1,220 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<style>
+		.ticks {
+		  font: 10px sans-serif;
+		}
+
+		.track,
+		.track-inset,
+		.track-overlay {
+		  stroke-linecap: round;
+		}
+
+		.track {
+		  stroke: #000;
+		  stroke-opacity: 0.3;
+		  stroke-width: 10px;
+		}
+
+		.track-inset {
+		  stroke: #ddd;
+		  stroke-width: 8px;
+		}
+
+		.track-overlay {
+		  pointer-events: stroke;
+		  stroke-width: 50px;
+		  stroke: transparent;
+		  cursor: crosshair;
+		}
+
+		.handle {
+		  fill: #fff;
+		  stroke: #000;
+		  stroke-opacity: 0.5;
+		  stroke-width: 1.25px;
+		}
+
+		</style>
+		<title>Force based label placement</title>
+		<script type="text/javascript" src="http://mbostock.github.com/d3/d3.js?2.6.0"></script>
+		<script type="text/javascript" src="http://mbostock.github.com/d3/d3.layout.js?2.6.0"></script>
+		<script type="text/javascript" src="http://mbostock.github.com/d3/d3.geom.js?2.6.0"></script>
+		<script src="//d3js.org/d3.v4.min.js"></script>
+	</head>
+	<body>
+		<script type="text/javascript" charset="utf-8">
+
+			var w = 1024, h = 768;
+			var labelDistance = 5;
+			var vis = d3.select("body").append("svg:svg").attr("width", w).attr("height", h);
+			var nodes = [];
+			var labelAnchors = [];
+			var labelAnchorLinks = [];
+			var links = [];
+		
+			// NODES:
+			// A) Contracts			
+			var node = {label : "C1", Type : "Contract", Size : 10}; // EaD = 100
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+			var node = {label : "C2", Type : "Contract", Size : 5}; // EaD = 50
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+			var node = {label : "C3", Type : "Contract", Size : 6}; // EaD = 60
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+			var node = {label : "C4", Type : "Contract", Size : 15}; // EaD = 30
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+			var node = {label : "C5", Type : "Contract", Size : 3}; // EaD = 5
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+			var node = {label : "C6", Type : "Contract", Size : 7.5}; // EaD = 75
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+
+			// B) Collaterals
+			var node = {label : "X1", Type : "Collateral", Size : 10};
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+			var node = {label : "X2", Type : "Collateral", Size : 4};
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+			var node = {label : "X3", Type : "Collateral", Size : 5};
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+			var node = {label : "X4", Type : "Collateral", Size : 6};
+			nodes.push(node);
+			labelAnchors.push({	node : node });
+			labelAnchors.push({	node : node });
+			
+			// LINKS:
+			links.push({ source : 1, target : 6, weight : 2});
+			links.push({ source : 6, target : 0, weight : 1});
+			links.push({ source : 0, target : 9, weight : 1.3});
+			links.push({ source : 0, target : 8, weight : 1});
+			links.push({ source : 0, target : 7, weight : 2});
+			links.push({ source : 3, target : 7, weight : 1});
+			links.push({ source : 3, target : 2, weight : 0.5});
+			links.push({ source : 2, target : 4, weight : 1});
+			links.push({ source : 2, target : 7, weight : 3.8});
+			links.push({ source : 5, target : 7, weight : 5});
+
+			for(var i = 0; i < nodes.length; i++) {
+				labelAnchorLinks.push({
+					source : i * 2,
+					target : i * 2 + 1,
+					weight : 1
+				});
+			};
+			
+
+			var force = d3.layout.force()
+								 .size([w, h])
+								 .nodes(nodes)
+								 .links(links)
+								 .gravity(1)
+								 .linkDistance(function(x){
+								 	return x.weight / 4
+								 })
+								 .charge(-10000)
+								 .linkStrength(8);
+
+			force.start();
+
+			var force2 = d3.layout.force().nodes(labelAnchors).links(labelAnchorLinks).gravity(0).linkDistance(0).linkStrength(8).charge(-100).size([w, h]);
+			force2.start();
+
+			var link = vis.selectAll("line.link").data(links).enter().append("svg:line").attr("class", "link").style("stroke", "#CCC");
+
+			var node = vis.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");
+			node.append("svg:circle").attr("r", function(x){return x.Size})
+									 .style("fill", function(x)
+									 	{
+									 		var color = "#fcb200"
+									 		if(x.Type == "Contract")
+									 			var color = "#fc0000"
+									 	return color
+									 	})
+									 .style("stroke", "#FFF")
+									 .style("stroke-width", 3);
+			node.call(force.drag);
+
+
+			var anchorLink = vis.selectAll("line.anchorLink").data(labelAnchorLinks)//.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");
+
+			var anchorNode = vis.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");
+			anchorNode.append("svg:circle").attr("r", 0).style("fill", "#FFF");
+				anchorNode.append("svg:text").text(function(d, i) {
+				return i % 2 == 0 ? "" : d.node.label
+			}).style("fill", "#555").style("font-family", "Arial").style("font-size", 11);
+
+			var updateLink = function() {
+				this.attr("x1", function(d) {
+					return d.source.x;
+				}).attr("y1", function(d) {
+					return d.source.y;
+				}).attr("x2", function(d) {
+					return d.target.x;
+				}).attr("y2", function(d) {
+					return d.target.y;
+				});
+
+			}
+
+			var updateNode = function() {
+				this.attr("transform", function(d) {
+					return "translate(" + d.x + "," + d.y + ")";
+				});
+
+			}
+
+
+			force.on("tick", function() {
+
+				force2.start();
+
+				node.call(updateNode);
+
+				anchorNode.each(function(d, i) {
+					if(i % 2 == 0) {
+						d.x = d.node.x;
+						d.y = d.node.y;
+					} else {
+						var b = this.childNodes[1].getBBox();
+
+						var diffX = d.x - d.node.x;
+						var diffY = d.y - d.node.y;
+
+						var dist = Math.sqrt(diffX * diffX + diffY * diffY);
+
+						var shiftX = b.width * (diffX - dist) / (dist * 2);
+						shiftX = Math.max(-b.width, Math.min(0, shiftX));
+						var shiftY = 5;
+						this.childNodes[1].setAttribute("transform", "translate(" + shiftX + "," + shiftY + ")");
+					}
+				});
+
+
+				anchorNode.call(updateNode);
+
+				link.call(updateLink);
+				anchorLink.call(updateLink);
+			});
+		</script>
+	</body>
+</html>
+
